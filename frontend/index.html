@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini RAG Chatbot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <div class="background-shape"></div>
+
+  <div class="chat-wrapper">
+    <div class="chat-container">
+      <header>
+        <h1>✨ Gemini RAG Chatbot</h1>
+        <span class="status-dot">Online</span>
+      </header>
+      
+      <div id="chat">
+        <div class="bot">Hello! I'm your AI assistant. How can I help you today?</div>
+      </div>
+
+      <div class="input-box">
+        <input id="user-input" type="text" placeholder="Type your message here..." onkeydown="if(event.key === 'Enter') sendMsg()" />
+        <button onclick="sendMsg()">
+           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+<script src="script.js"></script>
+</body>
+</html>
