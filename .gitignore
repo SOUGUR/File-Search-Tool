@@ -47,3 +47,9 @@ Desktop.ini
 
 # Logs
 *.log
+
+# App runtime data (SQLite registry)
+backend/var/
+*.db
+*.db-wal
+*.db-shm

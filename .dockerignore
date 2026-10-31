@@ -11,3 +11,6 @@ venv
 .gitignore
 .vscode
 *.log
+backend/var
+*.db
+backend/.env.example

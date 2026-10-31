@@ -1,32 +1,29 @@
-# Use an official Python runtime as a parent image
-FROM python:3.9-slim
+FROM python:3.12-slim
 
-# Set the working directory in the container
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    DB_PATH=/app/var/app.db \
+    WEB_CONCURRENCY=2
+
 WORKDIR /app
 
-# Add PYTHONPATH so Python can import backend.*
-ENV PYTHONPATH=/app
-
-# Install system dependencies if needed (none strictly for these python packages, but good practice)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy the backend requirements file
+# Dependencies first so this layer is cached between code changes.
 COPY backend/requirements.txt ./backend/requirements.txt
-
-# Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
-# Copy the rest of the application code
 COPY backend ./backend
 COPY frontend ./frontend
 
-# Expose port 8000 for FastAPI
+# Run as a non-root user; /app/var holds the SQLite registry (mount a volume there).
+RUN useradd --create-home --uid 10001 appuser \
+    && mkdir -p /app/var && chown -R appuser /app/var
+USER appuser
+
 EXPOSE 8000
 
-# Define environment variable
-# ENV NAME World
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4)"
 
-# Run app.py when the container launches
-CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Several worker processes per container; each is async and serves many users.
+CMD ["sh", "-c", "uvicorn backend.app:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY} --proxy-headers"]

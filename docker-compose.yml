@@ -1,11 +1,16 @@
-version: '3.8'
-
 services:
   app:
     build: .
     ports:
       - "8000:8000"
-    # Loads environment variables from backend/.env
-    # Ensure this file exists and contains GEMINI_API_KEY
+    # backend/.env must exist and contain GEMINI_API_KEY (see backend/.env.example)
     env_file:
       - backend/.env
+    environment:
+      WEB_CONCURRENCY: "${WEB_CONCURRENCY:-2}"
+    volumes:
+      - appdata:/app/var   # user -> store registry + upload jobs survive restarts
+    restart: unless-stopped
+
+volumes:
+  appdata:

@@ -4,33 +4,212 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gemini RAG Chatbot</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css" />
+  <script>
+    // Apply saved theme before paint to avoid a flash.
+    try { const t = JSON.parse(localStorage.getItem("rag.theme")); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}
+  </script>
 </head>
 <body>
+  <div class="app">
 
-  <div class="background-shape"></div>
-
-  <div class="chat-wrapper">
-    <div class="chat-container">
-      <header>
-        <h1>✨ Gemini RAG Chatbot</h1>
-        <span class="status-dot">Online</span>
-      </header>
-      
-      <div id="chat">
-        <div class="bot">Hello! I'm your AI assistant. How can I help you today?</div>
+    <!-- ============================ Sidebar ============================ -->
+    <nav class="sidebar" id="sidebar" aria-label="Main">
+      <div class="brand">
+        <img src="/static/favicon.svg" alt="" width="28" height="28" />
+        <span>Gemini RAG</span>
       </div>
 
-      <div class="input-box">
-        <input id="user-input" type="text" placeholder="Type your message here..." onkeydown="if(event.key === 'Enter') sendMsg()" />
-        <button onclick="sendMsg()">
-           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      <button class="new-chat" id="new-chat" type="button">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        New thread
+      </button>
+
+      <div class="nav-links">
+        <button class="nav-link active" id="nav-home" type="button">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Ask
+        </button>
+        <button class="nav-link" data-panel="docs-panel" type="button">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M7 3h7l5 5v13H7z M14 3v5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          My documents
+          <span class="count" id="doc-count" hidden></span>
+        </button>
+        <button class="nav-link" data-panel="settings-panel" type="button">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          Settings
         </button>
       </div>
-    </div>
+
+      <div class="sidebar-foot">
+        <div class="theme-switch" role="radiogroup" aria-label="Theme">
+          <button type="button" data-theme-choice="light" title="Light">☀️</button>
+          <button type="button" data-theme-choice="system" title="System">💻</button>
+          <button type="button" data-theme-choice="dark" title="Dark">🌙</button>
+        </div>
+        <div class="workspace">Workspace <code id="user-id"></code></div>
+      </div>
+    </nav>
+
+    <!-- ============================ Main ============================ -->
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-btn" id="menu-btn" type="button" aria-label="Open menu">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="brand small"><img src="/static/favicon.svg" alt="" width="22" height="22" /><span>Gemini RAG</span></div>
+        <button class="icon-btn" id="new-chat-mobile" type="button" aria-label="New thread">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+
+      <div class="scroll" id="scroll">
+        <!-- Empty state / home -->
+        <section class="hero" id="hero">
+          <h1>Ask your documents <span class="grad">anything</span></h1>
+          <p class="sub">Answers grounded in your files, with the sources shown.</p>
+          <div id="hero-composer-slot"></div>
+          <div class="suggestions" id="suggestions">
+            <button type="button" class="chip c1">📚 Summarise the GATE syllabus</button>
+            <button type="button" class="chip c2">🧮 Which topics cover linear algebra?</button>
+            <button type="button" class="chip c3">🗂️ List every section heading</button>
+            <button type="button" class="chip c4">💡 What should I study first?</button>
+          </div>
+        </section>
+
+        <!-- Conversation -->
+        <section class="thread" id="thread" hidden></section>
+      </div>
+
+      <!-- Composer (moved between hero and the bottom dock by script.js) -->
+      <div class="dock" id="dock"></div>
+      <form class="composer" id="chat-form">
+        <textarea id="user-input" rows="1" maxlength="8000" placeholder="Ask anything..." aria-label="Your question"></textarea>
+        <div class="composer-bar">
+          <div class="composer-left">
+            <label class="pill toggle t-shared" title="Search the shared knowledge base">
+              <input type="checkbox" data-setting="include_shared" checked />
+              <span>🌐 Shared</span>
+            </label>
+            <label class="pill toggle t-mine" title="Search the documents you uploaded">
+              <input type="checkbox" data-setting="include_mine" checked />
+              <span>📁 My docs</span>
+            </label>
+            <label class="pill select" title="Model">
+              <span class="sr-only">Model</span>
+              <select data-setting="model" id="model-select"></select>
+            </label>
+          </div>
+          <div class="composer-right">
+            <button type="button" class="icon-btn attach" data-panel="docs-panel" aria-label="Upload a document" title="Upload a document">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5l-9 9a2 2 0 0 1-3-3l8-8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+            <button type="submit" class="send" id="send-btn" aria-label="Send">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+      </form>
+    </main>
+
+    <!-- ============================ Settings drawer ============================ -->
+    <aside class="drawer" id="settings-panel" hidden aria-label="Settings">
+      <div class="drawer-head">
+        <h2>Answer settings</h2>
+        <button class="icon-btn close" type="button" aria-label="Close">✕</button>
+      </div>
+      <div class="drawer-body">
+        <section class="card">
+          <h3><span class="dot d-teal"></span>Personality</h3>
+          <label>System instruction
+            <textarea data-setting="system_instruction" rows="3" maxlength="4000" placeholder="e.g. Answer in short bullet points and mention page numbers."></textarea>
+          </label>
+          <label class="switch"><input type="checkbox" data-setting="use_history" checked /><span class="track"></span>Remember the conversation</label>
+        </section>
+
+        <section class="card">
+          <h3><span class="dot d-coral"></span>Creativity</h3>
+          <label>Temperature <output data-for="temperature"></output>
+            <input type="range" data-setting="temperature" min="0" max="2" step="0.1" data-default="" />
+          </label>
+          <p class="hint">Low = focused and factual · High = more creative. Leave untouched to use the model default.</p>
+          <div class="grid2">
+            <label>Top-p <input type="number" data-setting="top_p" min="0" max="1" step="0.05" placeholder="auto" /></label>
+            <label>Top-k <input type="number" data-setting="top_k" min="1" max="100" step="1" placeholder="auto" /></label>
+          </div>
+          <label>Max answer length (tokens) <input type="number" data-setting="max_output_tokens" min="1" max="65536" placeholder="auto" /></label>
+        </section>
+
+        <section class="card">
+          <h3><span class="dot d-blue"></span>Retrieval</h3>
+          <label>Sources per answer <input type="number" data-setting="retrieval_top_k" min="1" max="50" placeholder="auto" /></label>
+          <label>Metadata filter
+            <input type="text" data-setting="metadata_filter" maxlength="1000" placeholder='year >= 2021 AND subject = "math"' />
+          </label>
+          <p class="hint">Only search documents whose metadata matches. Uses the metadata you added when uploading.</p>
+        </section>
+
+        <div class="row">
+          <button type="button" id="reset-settings" class="btn ghost">Reset to defaults</button>
+        </div>
+        <p class="hint">Settings are saved in this browser automatically.</p>
+      </div>
+    </aside>
+
+    <!-- ============================ Documents drawer ============================ -->
+    <aside class="drawer" id="docs-panel" hidden aria-label="My documents">
+      <div class="drawer-head">
+        <h2>My documents</h2>
+        <button class="icon-btn close" type="button" aria-label="Close">✕</button>
+      </div>
+      <div class="drawer-body">
+        <form id="upload-form">
+          <label class="dropzone" id="dropzone">
+            <input type="file" name="file" id="file-input" hidden />
+            <span class="dz-icon">⬆️</span>
+            <span class="dz-title" id="dz-title">Drop a file here or <u>browse</u></span>
+            <span class="dz-sub" id="upload-limits"></span>
+          </label>
+
+          <label>Display name <input type="text" name="display_name" maxlength="512" placeholder="Optional" /></label>
+
+          <details class="advanced">
+            <summary>Advanced: chunking &amp; metadata</summary>
+            <div class="grid2">
+              <label>Chunk size <small id="chunk-range"></small>
+                <input type="number" name="max_tokens_per_chunk" id="chunk-size" required /></label>
+              <label>Overlap <small id="overlap-range"></small>
+                <input type="number" name="max_overlap_tokens" id="chunk-overlap" required /></label>
+            </div>
+            <p class="hint">Smaller chunks give more precise matches but less context per match. Overlap stops sentences being split between chunks.</p>
+            <label>Metadata <small>one <code>key=value</code> per line · <code>a|b</code> = list</small>
+              <textarea name="metadata" rows="3" placeholder="subject=math&#10;year=2024&#10;tags=exam|notes"></textarea></label>
+          </details>
+
+          <button type="submit" id="upload-btn" class="btn primary">Upload &amp; index</button>
+          <p id="upload-msg" class="status-line" role="status"></p>
+        </form>
+
+        <div class="list-head">
+          <h3>Indexed</h3>
+          <button type="button" id="refresh-docs" class="icon-btn small" aria-label="Refresh">↻</button>
+        </div>
+        <ul id="doc-list" class="doc-list"></ul>
+
+        <div class="list-head"><h3>Recent uploads</h3></div>
+        <ul id="job-list" class="doc-list"></ul>
+
+        <p class="hint">Your documents are private to this browser's workspace ID.</p>
+      </div>
+    </aside>
+
+    <div class="scrim" id="scrim" hidden></div>
+    <div class="toast" id="toast" role="status" hidden></div>
   </div>
 
-<script src="/static/script.js"></script>
+  <script src="/static/script.js"></script>
 </body>
 </html>
